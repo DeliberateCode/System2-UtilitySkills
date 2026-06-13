@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "sys2",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "source": "./plugin",
       "description": "A collection of utility skills for Claude Code, independent of the core System2 multi-agent pipeline.",
       "author": {

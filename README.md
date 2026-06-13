@@ -30,6 +30,8 @@ Restart so the new skills are loaded.
 
 Runs an instruction in a stateless subprocess loop. Each iteration invokes `claude -p` with no LLM context from prior runs — the only continuity between iterations is the file system on disk.
 
+Each iteration runs as a separate Bash call, so every iteration gets its own 10-minute timeout window (a hard limit imposed by Claude Code on bash processes) rather than the entire loop sharing one.
+
 The sub-agent is instructed to output `STATUS: CLEAN` when the task is fully resolved. The loop exits when that signal is detected or when the iteration cap is reached.
 
 **Usage:**
