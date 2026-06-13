@@ -50,6 +50,38 @@ The sub-agent is instructed to output `STATUS: CLEAN` when the task is fully res
 |------|---------|-------------|
 | `--max_iterations N` | 10 | Hard cap on loop iterations |
 
+### `/sys2:gemini`
+
+Runs a prompt through Google's Gemini CLI non-interactively via `gemini -p`. Useful for getting a second opinion, code review, or any task where you want Gemini's perspective on the current project.
+
+**Usage:**
+
+```
+/sys2:gemini check my unstaged changes and perform a code review
+```
+
+```
+/sys2:gemini "explain the architecture of this project" --model gemini-2.5-pro
+```
+
+Any flags supported by `gemini` (e.g. `--model`, `--sandbox`, `--yolo`) are passed through.
+
+### `/sys2:codex`
+
+Runs a prompt through OpenAI's Codex CLI non-interactively via `codex exec`. Useful for getting a second opinion, code review, or any task where you want Codex's perspective on the current project.
+
+**Usage:**
+
+```
+/sys2:codex review the recent changes for security issues
+```
+
+```
+/sys2:codex "find and fix type errors in src/" --model o3
+```
+
+Any flags supported by `codex exec` (e.g. `--model`, `--sandbox`, `--config`) are passed through.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
