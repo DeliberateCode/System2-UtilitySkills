@@ -52,7 +52,7 @@ The sub-agent is instructed to output `STATUS: CLEAN` when the task is fully res
 
 ### `/sys2:gemini`
 
-Runs a prompt through Google's Gemini CLI non-interactively via `gemini -p`. Useful for getting a second opinion, code review, or any task where you want Gemini's perspective on the current project.
+Runs a prompt through Google's Antigravity CLI (`agy`, which replaced the older standalone `gemini` CLI) non-interactively via `agy -p`. Useful for getting a second opinion, code review, or any task where you want Gemini's perspective on the current project. (`agy` can also target Claude and GPT-OSS models via `--model`.)
 
 **Usage:**
 
@@ -61,10 +61,10 @@ Runs a prompt through Google's Gemini CLI non-interactively via `gemini -p`. Use
 ```
 
 ```
-/sys2:gemini "explain the architecture of this project" --model gemini-2.5-pro
+/sys2:gemini "explain the architecture of this project" --model "Gemini 3.1 Pro (High)"
 ```
 
-Any flags supported by `gemini` (e.g. `--model`, `--sandbox`, `--yolo`) are passed through.
+Any flags supported by `agy` (e.g. `--model`, `--sandbox`, `--dangerously-skip-permissions`, `--add-dir`) are passed through. Old `gemini` flags map across: `--yolo` → `--dangerously-skip-permissions`, `--include-directories` → `--add-dir`, `--resume` → `--continue`/`--conversation`.
 
 ### `/sys2:codex`
 

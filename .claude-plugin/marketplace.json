@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "sys2",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "source": "./plugin",
       "description": "A collection of utility skills for Claude Code, independent of the core System2 multi-agent pipeline.",
       "author": {
@@ -19,7 +19,12 @@
       "homepage": "https://github.com/DeliberateCode/System2-UtilitySkills",
       "repository": "https://github.com/DeliberateCode/System2-UtilitySkills",
       "license": "MIT",
-      "keywords": ["skills", "utilities", "productivity", "claude-code"],
+      "keywords": [
+        "skills",
+        "utilities",
+        "productivity",
+        "claude-code"
+      ],
       "category": "utilities"
     }
   ]
