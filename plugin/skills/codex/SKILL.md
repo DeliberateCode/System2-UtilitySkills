@@ -28,8 +28,19 @@ The user provides:
 Run a **single Bash call** with timeout 600000 (10 minutes):
 
 ```
-codex exec '<prompt>' [flags...]
+codex exec --ephemeral -c history.persistence=none '<prompt>' [flags...]
 ```
+
+**Statelessness (required).** This skill is a one-shot second opinion; each call must be
+hermetic and must not see or leave behind any record of other invocations. Codex otherwise
+persists state to two on-disk stores under `$CODEX_HOME` (default `~/.codex`): session
+rollout transcripts in `sessions/`, and a running prompt log in `history.jsonl` (default
+persistence `save-all`). Plain `codex exec` does not auto-resume those, but the running
+agent can read them mid-task, and every run appends to them. To prevent both:
+
+- Always pass `--ephemeral` (do not write session rollout files), unless the user explicitly passed it.
+- Always pass `-c history.persistence=none` (do not append to `history.jsonl`), unless the user already supplied a `history.persistence` override via their own `-c`/`--config`.
+- Never add `resume` / `--last`, and never set `experimental_resume` — those deliberately reload prior context.
 
 Shell-quoting rules for the prompt:
 - If the prompt contains no single quotes, wrap it in single quotes.
