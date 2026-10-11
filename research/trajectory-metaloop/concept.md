@@ -69,7 +69,7 @@ failures arrived; routine passes do not trigger it.
 ## Research program
 
 13 hypotheses ordered by testability, cheapest falsification first
-(`references/hypotheses.md`). Flagship: **H-SYN-2** — the closed loop
+(`research-program/hypotheses.md`). Flagship: **H-SYN-2** — the closed loop
 (monitor → categorize → distill → A/B-validate → inject) reduces failures per
 1k trajectories epoch over epoch while rule-store memory grows sublinearly.
 Track `(failures/1k, rule-store bytes)` per epoch.
@@ -82,7 +82,7 @@ Track `(failures/1k, rule-store bytes)` per epoch.
 - `references/trajectory-schema.md` — the typed trajectory input schema
 - `references/metaloop-method.md` — funnel schemas, lifecycle/eviction, worked
   example
-- `references/hypotheses.md` — the 13-hypothesis backlog
+- `research-program/hypotheses.md` — the 13-hypothesis backlog
 - `bin/judge-lint.py` — machine validator for judge output
 - 36-paper literature corpus grounding the hypotheses (ToM, trajectory
   failure, metaloop)
