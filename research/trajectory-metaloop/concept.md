@@ -9,8 +9,8 @@
 Agent failures are invisible at scale. A run either "worked" or it didn't —
 binary pass/fail misrepresents partial failures, and the taxonomy of *what went
 wrong* is ad hoc per team. Meanwhile, every "self-improving loop" proposal
-drowns in transcripts: keeping raw trajectories as memory is a cost blowup that
-compounds epoch over epoch.
+is overwhelmed by transcript storage: keeping raw trajectories as memory
+incurs costs that compound epoch over epoch.
 
 Two gaps, one skill:
 
@@ -21,7 +21,7 @@ Two gaps, one skill:
 
 ## Approach
 
-**Mode A — analyze.** Map a transcript to typed trajectory JSON
+**Mode A — analyze.** Map a transcript to a typed trajectory record
 (`user_message | assistant_message | tool_call | tool_result | system`), then
 run a two-tier judge: cheap heuristics first (tool loops ≥5×, error strings,
 timeouts, step caps), targeted LLM review only for what heuristics can't see
@@ -30,17 +30,17 @@ ATFD 7-category / 24-subcategory taxonomy (dotted `category.subcategory`, no
 invented labels), given a severity and step attribution, and rolled up to an
 outcome tier: `pass` | `degraded` (complete but needs human review) | `fail`.
 Every judge run reports its own cost — tokens, calls, latency, dollars. The
-cost report is part of the output, not an afterthought. Emitted JSON is
-machine-validated (`bin/judge-lint.py`) before it's presented.
+cost report is part of the output, not an afterthought. Emitted output is
+machine-validated (prototype: `bin/judge-lint.py`) before it's presented.
 
 **Mode B — learn.** Runs only on Mode-A output — categorized findings, never
-raw transcripts. Harvest each analyzed trajectory to one episode tuple, cluster
-episodes by failure category + task prefix into patterns (confidence floor
-0.3), turn surviving patterns into terse rule candidates, then A/B each
+raw transcripts. Extract one episode tuple from each analyzed trajectory, cluster
+episodes by failure category + task prefix into patterns (tunable confidence
+floor), turn surviving patterns into single-sentence rule candidates, then A/B each
 candidate on held-out episodes: run with and without the rule injected. Promote
 on clear improvement, hold if inconclusive, discard if worse; log every
 decision in an append-only ledger. The expensive loop runs only when new
-failures arrived — residual failures, not routine passes, earn the budget.
+failures arrived; routine passes do not trigger it.
 
 ## Design principles
 
@@ -50,13 +50,12 @@ failures arrived — residual failures, not routine passes, earn the budget.
   label.
 - **Judge the trajectory, not the agent.** No ground-truth labels, expected
   states, or oracle info beyond events + task description.
-- **Every memory needs a death condition.** Rules carry credit (5.0 start,
-  clamped [0,10]); 3 inconclusive re-validations → archive; reverse check
-  (does removing the rule hurt?) → revert; N epochs unused → evict. Revert is
-  single-rule, never whole-store. If the store can't be injected wholesale,
-  the funnel failed.
+- **Every memory needs a death condition.** Rules carry credit (starting value
+  and bounds tunable); repeated inconclusive re-validations → archive (threshold
+  tunable); reverse check (does removing the rule hurt?) → revert; N epochs
+  unused → evict. Revert is single-rule, never whole-store. If the store can't
+  be injected wholesale, the memory bound is violated.
 - **Optimize detection-rate-per-dollar at bounded memory, not raw accuracy.**
-  The cost report is the scoreboard.
 
 ## Known caveats
 
