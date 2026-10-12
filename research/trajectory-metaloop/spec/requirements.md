@@ -18,8 +18,11 @@
   in tool results, timeouts, step caps). Tier 2: targeted LLM review only
   for what heuristics cannot see (communication, quality, safety, state).
   Record the detecting tier per finding. When tier-1 uncertainty is high the
-  case escalates to tier-2, and tier-2's verdicts adjust tier-1's thresholds
-  over epochs. Track the tier-1 miss rate on tier-2-flagged events — a flat
+  case escalates to tier-2. A separate retune step adjusts tier-1's
+  thresholds from tier-2's verdicts, grouped by batch (batch id defaults
+  to run date). Retune state — the threshold table and retune log — is
+  local to the skill in standalone use and lives in the loop's state
+  directory in the loop case. Track the tier-1 miss rate on tier-2-flagged events — a flat
   gap means the fast tier is frozen and FR-A2 is failing.
 - **FR-A3 — Closed-vocabulary classification with per-finding confidence.**
   Each finding carries `severity` (`error | warning | info`), `category`
@@ -34,9 +37,10 @@
   exists; `fail` ⟺ ≥1 error-severity finding AND the artifact is missing or
   wrong; `pass` otherwise. Low-confidence findings (below a tunable floor)
   cannot single-handedly flip a tier.
-- **FR-A5 — Mandatory cost report.** Every judge run reports its own cost:
-  monetary cost, wall latency, total tokens, API calls. Cost fields are
-  required, never omitted.
+- **FR-A5 — Cost reporting (deferred).** Shelved until the system works end
+  to end. When reinstated: every judge run reports monetary cost (from the
+  canonical price table), wall latency, total tokens, and API calls; cost
+  fields required, never omitted.
 - **FR-A6 — Schema validation before presentation.** A validator program must check
   every emitted record against the output schema before presentation; fix
   and re-validate until clean. (Prototype: `bin/judge-lint.py` — the script
@@ -77,7 +81,10 @@
   promote on lower confidence bound > 0; Holm–Bonferroni family-wise error
   control across candidates. If the episode budget cannot support the
   required n, FR-B4 is unexecutable as specified — use a cheaper proxy and
-  document the substitution explicitly in the ledger. Record the delta and
+  document the substitution explicitly in the ledger. Acceptable proxies
+  must remain oracle-verified (for example, a smaller oracle-scored sample
+  with wider confidence bounds); judge-flag counts are never an acceptable
+  proxy. Record the delta and
   the store content identifier at promotion.
 - **FR-B5 — Update with the ledger as source of truth.** The decision ledger
   is the system of record; the rule store is a derived snapshot rebuildable
@@ -88,17 +95,21 @@
   episodes alone with a reproducing delta.
 - **FR-B6 — Evict stale rules; re-validate on a fixed cadence.** Every rule carries a death
   condition: confidence floor, disuse eviction, failed re-validation, or
-  reverse ablation (removing the rule must not help or be neutral). The
+  reverse ablation (evict when removing the rule helps or is neutral within
+  tolerance — a rule survives only if its presence demonstrably reduces
+  failures). The
   learning gate (new failures → reflect/select) is split from periodic
   re-validation: re-validate every N epochs regardless of new failures, so
   quiet periods cannot leave stale rules with unchanged credit scores.
   Gate decisions are ledgered as idempotent entries.
 - **FR-B7 — Atomic, idempotent epochs.** An epoch commits in idempotent
   stages, each recorded in an epoch progress marker. After a crash, reruns
-  resume from the last committed stage instead of restarting the epoch. A
-  crash mid-select followed by rerun must produce bit-identical episode
-  counts and confidence values — no duplicate appends, no phantom
-  denominators.
+  resume from the last committed stage instead of restarting the epoch:
+  no duplicate appends, no phantom denominators. All stages downstream of
+  extraction are deterministic — rerunning them over the same extracted
+  episodes reproduces identical counts and confidence values. The judge is
+  stochastic; rerunning extraction is not expected to reproduce identical
+  episodes.
 
 ## 3. Logical data model
 
@@ -109,10 +120,10 @@ storage layout are design-time decisions** (OQ-9).
 - **Trajectory record.** Attributes: id, task description, ordered typed
   events (each: type, timestamp, content, metadata). Invariant: no invented
   events; gaps marked as system notes.
-- **Judge-output record.** Attributes: trajectory id, taxonomy version,
-  findings[] (each: severity, category, confidence, description, optional
-  attribution), outcome tier, cost report (monetary cost, latency, tokens,
-  API calls). Invariant: closed 24-label vocabulary; cost always present.
+- **Judge-output record.** Attributes: trajectory id, task description,
+  taxonomy version, findings[] (each: severity, category, confidence,
+  description, optional attribution), outcome tier. Invariant: closed 24-label
+  vocabulary.
 - **Episode record.** Attributes: content-derived id, task, action summary,
   outcome, failure categories, taxonomy version, trace reference.
   Invariant: the trace suffices to re-derive the finding under a new
@@ -129,21 +140,35 @@ storage layout are design-time decisions** (OQ-9).
 - **Epoch progress record.** Attributes: epoch id, staged commit markers.
   Invariant: reruns are idempotent.
 
+**Mode A→B handoff.** One handoff per judged trajectory: the Judge-output
+record plus the retained trace (retention per OQ-7). Mode B consumes this
+handoff and never raw transcripts.
+
 ## 4. Non-functional requirements
 
 - **NFR-1 — Taxonomy versioning, enforced.** The 24-label vocabulary is
   pinned and versioned; the version is stamped on every finding, episode,
   pattern, and rule. Mixed-version clustering is refused with an explicit
   error, never silently; version bumps require an explicit migration map.
+  Bumps are authorized by the human skill operator, never by the loop
+  itself. A migration map must cover every label of the old version —
+  checked mechanically for complete coverage and valid mapping kinds —
+  and pass human review before commit.
 - **NFR-2 — Bounded memory.** The rule store must remain small enough to
   inject wholesale. Growth is sublinear by construction (confidence floor +
   eviction); if the store cannot be injected whole, the bounded-memory
   requirement is violated.
-- **NFR-3 — Complete epoch-level cost accounting.** Epoch-level cost accounting, itemized
-  across harvest/reflect/aggregate/select/update — including the full
-  trajectory re-executions inside select. The scoreboard is
-  **oracle-verified failures prevented per loop-cost per epoch**, with a
-  precision floor against the calibration set and a halt condition.
+- **NFR-3 — Epoch scoreboard with precision floor and halt condition.** The
+  scoreboard is **oracle-verified failures prevented per epoch**, with a
+  precision floor and a halt condition. (Cost accounting deferred with
+  FR-A5.) The precision floor measures finding-level category precision —
+  the fraction of judge findings whose category matches adjudicator
+  consensus. The threshold is calibrated from the AC-5 gate: precision may
+  not fall more than 0.10 below the gate-measured baseline (margin subject
+  to recalibration). Each epoch adjudicates a fresh sample via an
+  independent decision model (separated model family) or human spot-checks;
+  re-scoring the fixed calibration set serves only as a drift warning. Two
+  consecutive breaches fire the halt condition.
 - **NFR-4 — Deterministic validation gate.** A validator program checks
   every emitted record against the schema; no unvalidated output is ever
   presented.
@@ -161,11 +186,11 @@ storage layout are design-time decisions** (OQ-9).
 - **AC-2.** Mode B over a labeled episode set promotes ≥1 rule with a
   positive held-out delta measured against the independent oracle,
   ledger-recorded with full provenance.
-- **AC-3.** Rule-store size stays bounded over K epochs while oracle-verified
+- **AC-3.** Rule-store size stays bounded over 5 epochs while oracle-verified
   failures/1k trends down **and task-completion rate does not regress**
   (the completion-rate clause blocks degenerate strategies that cut
   failures by attempting fewer tasks).
-- **AC-4.** Every judge run in the test set includes a complete,
+- **AC-4 (deferred with FR-A5).** Every judge run in the test set includes a complete,
   non-negative cost report; every epoch includes itemized loop cost.
 - **AC-5 — Calibration gate (kill criterion KC-1).** Before building the
   loop: 2–3 annotators, 200 trajectories, Cohen's κ on the 24-label
@@ -231,7 +256,7 @@ storage layout are design-time decisions** (OQ-9).
 | FR-B6 fixed-cadence re-validation | Adversarial review (distsys §5) |
 | FR-B7 epoch transactions | Adversarial review (distsys §1) |
 | NFR-1 versioning enforced | Adversarial review (distsys §4; neuro §1) |
-| NFR-3 complete cost accounting | Adversarial review (ai-sci §4) |
+| NFR-3 epoch scoreboard | Adversarial review (ai-sci §4) |
 | NFR-5 memory dynamics | Adversarial review (neuro §4) |
 | AC-3 completion-rate clause | Adversarial review (neuro §3) |
 | AC-5, KC-1, KC-2 | Adversarial review (ai-sci kill criteria) |
